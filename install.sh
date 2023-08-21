@@ -8,11 +8,12 @@
 
 # CONFIG_FILE="$1"
 
-DEVICE=
+DEVICE=sda
+ROOT_PART=sda2
 BASE_SYSTEM_PKG=(base base-devel linux linux-headers linux-firmware vim nano dhcpcd openssh zsh man-db man-pages btrfs-progs sudo networkmanager amd-ucode intel-ucode)
 EXTRA_PKG=(git wget curl aria2 axel rsync htop neofetch fish neovim wezterm plasma-nm plasma dolphin ark dolphin-plugins kate)
-HOSTNAME_INSTALL=
-USER_NAME=
+HOSTNAME_INSTALL=test
+USER_NAME=test
 
 # VERIFY BOOT MODE
 efi_boot_mode(){
@@ -64,7 +65,6 @@ parted -s "$DEVICE" mkpart primary btrfs 512M 100%
 echo "Create btrfs partition successfully!"
 # mkfs.fat -F32
 
-ROOT_PART="$DEVICE"p2
 mount /dev/"$ROOT_PART" /mnt
 btrfs subvolume create /mnt/@
 btrfs subvolume create /mnt/@home
