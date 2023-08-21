@@ -158,8 +158,8 @@ sed -i "s/# %wheel/%wheel/g" /etc/sudoers
 sed -i "s/%wheel ALL=(ALL) NOPASSWD: ALL/# %wheel ALL=(ALL) NOPASSWD: ALL/g" /etc/sudoers
 echo "Set sudoers successfully!"
 
-boorctl --path=/boot install
-boorctl --path=/boot update
+bootctl --path=/boot install
+bootctl --path=/boot update
 echo "Install and update systemd-boot successfully!"
 lsblk -f
 echo "Press anykey to continue..."
@@ -201,6 +201,7 @@ echo "Successfully set environment variables!"
 echo "Successfully set PATH!"
 echo "Successfully set alias!"
 
-echo "Your system is installed.  Type anykey now to shutdown system and remove bootable media, then restart"
+echo "Your system is installed. Press any key now to shutdown system and remove bootable media, then restart"
 read empty
+exit
 shutdown now
