@@ -10,7 +10,9 @@
 
 DEVICE=sda
 ROOT_PART=sda2
-BASE_SYSTEM_PKG=(base base-devel linux linux-headers linux-firmware vim nano dhcpcd openssh zsh man-db man-pages btrfs-progs sudo networkmanager amd-ucode intel-ucode)
+# UCODE=amd-ucode
+UCODE=intel-ucode
+BASE_SYSTEM_PKG=(base base-devel linux linux-headers linux-firmware vim nano dhcpcd openssh zsh man-db man-pages btrfs-progs sudo networkmanager)
 EXTRA_PKG=(git wget curl aria2 axel rsync htop neofetch fish neovim wezterm plasma-nm plasma dolphin ark dolphin-plugins kate)
 HOSTNAME_INSTALL=test
 USER_NAME=test
@@ -30,12 +32,12 @@ echo "Config pacman conf successfully!"
 systemctl is-active --quiet reflector.service && systemctl stop reflector.service
 echo "Stop reflector service successfully!"
 
-echo "Checking internet connectivity..."
-if ! ping -c 3 archlinux.org &>/dev/null; then
-    echo "Not Connected to Network! Please connect to the internet and try again."
-    exit 1
-fi
-echo "Internet connection is available."
+# echo "Checking internet connectivity..."
+# if ! ping -c 3 bing.com &>/dev/null; then
+#     echo "Not Connected to Network! Please connect to the internet and try again."
+#     exit 1
+# fi
+# echo "Internet connection is available."
 
 pacman-key --init
 pacman-key --populate archlinux
@@ -57,13 +59,14 @@ timedatectl status
 #     echo "yq exists. Skipping installation."
 # fi
 
-parted -s "$DEVICE" mklabel gpt
+parted -s /dev/"$DEVICE" mklabel gpt
 echo "Create gpt label successfully!"
-parted -s "$DEVICE" mkpart primary fat32 1M 512M
+parted -s /dev/"$DEVICE" mkpart primary fat32 1M 512M
 echo "Create efi partition successfully!"
-parted -s "$DEVICE" mkpart primary btrfs 512M 100%
+parted -s /dev/"$DEVICE" mkpart primary btrfs 512M 100%
 echo "Create btrfs partition successfully!"
-# mkfs.fat -F32
+mkfs.fat -F32 /dev/"$DEVICE"1
+mkfs.btrfs /dev/"$DEVICE"2
 
 mount /dev/"$ROOT_PART" /mnt
 btrfs subvolume create /mnt/@
@@ -88,51 +91,48 @@ echo "Mount boot partition successfully!"
 
 # BASE_SYSTEM_PKG=$(yq eval ".packages.base_system | join(" ")" "$CONFIG_FILE")
 # EXTRA_PKG=$(yq eval ".packages.extra | join(" ")" "$CONFIG_FILE")
-pacstrap /mnt "${BASE_SYSTEM_PKG[@]}" "${EXTRA_PKG[@]}"
+pacstrap /mnt "${BASE_SYSTEM_PKG[@]}" "${EXTRA_PKG[@]}" "$UCODE"
 echo "Install base system successfully!"
 
 genfstab -U /mnt > /mnt/etc/fstab
 echo "Generate fstab successfully!"
 
-arch-chroot /mnt
-echo "Chroot to /mnt successfully!"
-
-ln -s /usr/bin/vim /usr/bin/vi
+ln -s /mnt/usr/bin/vim /mnt/usr/bin/vi
 echo "Create vi link to vim successfully!"
 
-ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
-hwclock --systohc
+ln -sf /mnt/usr/share/zoneinfo/Asia/Shanghai /mnt/etc/localtime
+arch-chroot /mnt hwclock --systohc
 echo "Set timezone successfully!"
 
-cat > /etc/locale.gen << EOF
+cat > /mnt/etc/locale.gen << EOF
 en_US.UTF-8 UTF-8
-zh_CN.UTF-8 UTF-8" 
+zh_CN.UTF-8 UTF-8 
 EOF
-locale-gen
+arch-chroot /mnt locale-gen
 echo "Generate locale successfully!"
 
 # HOSTNAME_INSTALL=$(yq eval ".hostname" "$CONFIG_FILE")
-echo "$HOSTNAME_INSTALL" > /etc/hostname
-cat > /etc/hosts << EOF
+echo "$HOSTNAME_INSTALL" > /mnt/etc/hostname
+cat > /mnt/etc/hosts << EOF
 127.0.0.1	localhost
 ::1		localhost
 127.0.1.1	$HOSTNAME_INSTALL.localdomain $HOSTNAME_INSTALL
 EOF
 echo "Set hostname and host successfully!"
 
-systemctl enable NetworkManager
+arch-chroot /mnt systemctl enable NetworkManager
 echo "Enable NetworkManager successfully!"
 
-echo 'Server = https://mirrors.ustc.edu.cn/archlinux/$repo/os/$arch' > /etc/pacman.d/mirrorlist
+echo 'Server = https://mirrors.ustc.edu.cn/archlinux/$repo/os/$arch' > /mnt/etc/pacman.d/mirrorlist
 echo "Change mirror to USTC successfully!"
-sed -i "s/#Color/Color/g" /etc/pacman.conf
-sed -i "s/#ParallelDownloads = 5/ParallelDownloads = 16/g" /etc/pacman.conf
-cat >> /etc/pacman.conf << EOF
-[Clansty]
-SigLevel = Never
-Server = https://repo.lwqwq.com/archlinux/\$arch
-Server = https://pacman.ltd/archlinux/\$arch
-Server = https://repo.clansty.com/archlinux/\$arch
+sed -i "s/#Color/Color/g" /mnt/etc/pacman.conf
+sed -i "s/#ParallelDownloads = 5/ParallelDownloads = 16/g" /mnt/etc/pacman.conf
+cat >> /mnt/etc/pacman.conf << EOF
+# [Clansty]
+# SigLevel = Never
+# Server = https://repo.lwqwq.com/archlinux/\$arch
+# Server = https://pacman.ltd/archlinux/\$arch
+# Server = https://repo.clansty.com/archlinux/\$arch
 
 [menci]
 SigLevel = Never
@@ -140,44 +140,52 @@ Server = https://aur.men.ci/archlinux/\$arch
 EOF
 echo "Config pacman conf successfully!"
 
-systemctl enable sshd
-systemctl enable dhcpcd.service
-systemctl enable NetworkManager.service
+arch-chroot /mnt systemctl enable sshd
+arch-chroot /mnt systemctl enable dhcpcd.service
+arch-chroot /mnt systemctl enable NetworkManager.service
 # systemctl enable sddm
 echo "Enable sshd successfully!"
 # echo "Enable sshd and sddm successfully!"
 
 # USER_NAME=$(yq eval ".user.name" "$CONFIG_FILE")
-useradd -m -G wheel -s /bin/bash "$USER_NAME"
+arch-chroot /mnt useradd -m -G wheel -s /bin/bash "$USER_NAME"
 echo "Add user successfully!"
-passwd "$USER_NAME"
+arch-chroot /mnt passwd "$USER_NAME"
 echo "Set user password successfully!"
 # visudo
 # echo "%wheel ALL=(ALL) ALL" >> /etc/sudoers
-sed -i "s/# %wheel/%wheel/g" /etc/sudoers
-sed -i "s/%wheel ALL=(ALL) NOPASSWD: ALL/# %wheel ALL=(ALL) NOPASSWD: ALL/g" /etc/sudoers
+sed -i "s/# %wheel/%wheel/g" /mnt/etc/sudoers
+sed -i "s/%wheel ALL=(ALL) NOPASSWD: ALL/# %wheel ALL=(ALL) NOPASSWD: ALL/g" /mnt/etc/sudoers
 echo "Set sudoers successfully!"
 
-bootctl --path=/boot install
-bootctl --path=/boot update
+arch-chroot /mnt bootctl --path=/boot install
+arch-chroot /mnt bootctl --path=/boot update
 echo "Install and update systemd-boot successfully!"
 lsblk -f
 echo "Press anykey to continue..."
 read empty
-vim /boot/loader/entries/arch.conf
-systemctl enable systemd-boot-update.service
+UUID=$(lsblk -o UUID -J /dev/"$ROOT_PART" | grep -oP '(?<="uuid": ")[^"]+')
+cat > /mnt/boot/loader/entries/arch.conf << EOF
+title          Arch Linux
+linux          /vmlinuz-linux-zen
+initrd         /initramfs-linux-zen.img
+initrd         /"$UCODE".img
+options        root=UUID="$ROOT_PART" rootflags=subvol=@,compress=zstd:3 rw loglevel=3 quiet systemd.show_status=1
+EOF
+arch-chroot /mnt systemctl enable systemd-boot-update.service
 echo "Enable systemd-boot-update.service successfully!"
 
-pacman -Syyu --noconfirm
-pacman -S --noconfirm opendesktop-fonts noto-fonts-cjk noto-fonts-emoji noto-fonts-extra ttf-sarasa-gothic
+arch-chroot /mnt pacman -Syyu --noconfirm
+arch-chroot /mnt pacman -S --noconfirm opendesktop-fonts noto-fonts-cjk noto-fonts-emoji noto-fonts-extra ttf-sarasa-gothic
 echo "Install fonts successfully!"
-pacman -S --noconfirm fcitx5-im fcitx5-rime fcitx5-configtool fcitx5-gtk fcitx5-qt fcitx5-material-color
+arch-chroot /mnt pacman -S --noconfirm fcitx5-im fcitx5-rime fcitx5-configtool fcitx5-gtk fcitx5-qt fcitx5-material-color
 echo "Install fcitx5 successfully!"
 
-su "$USER_NAME"
-echo "Switch to user successfully!"
+# su "$USER_NAME"
+# echo "Switch to user successfully!"
 echo "Start customizing your system!"
-cat >> ~/.bashrc << EOF
+touch /mnt/usr/"$USER_NAME"/.bashrc
+cat >> /mnt/usr/"$USER_NAME"/.bashrc << EOF
 export QT_IM_MODULE=fcitx
 export GTK_IM_MODULE=fcitx
 export XMODIFIERS=@im=fcitx
@@ -186,12 +194,13 @@ export LANG=zh_CN.UTF-8
 export _JAVA_OPTIONS="-Dawt.useSystemAAFontSettings=on"
 export PATH=\$HOME/.config/yarn/global/node_modules/.bin/:\$HOME/.yarn/bin:\$HOME/.local/bin:\$PATH'
 EOF
-cat >> ~/.config/fish/config.fish << EOF
+mkdir -p /mnt/usr/"$USER_NAME"/.config/fish
+cat >> /mnt/usr/"$USER_NAME"/.config/fish/config.fish << EOF
 alias open=dolphin
 alias :q=exit
 alias reboot2efi=systemctl reboot --firmware-setup
 EOF
-cat >> ~/.pam_environment << EOF
+cat >> /mnt/usr/"$USER_NAME"/.pam_environment << EOF
 GTK_IM_MODULE DEFAULT=fcitx
 QT_IM_MODULE  DEFAULT=fcitx
 XMODIFIERS    DEFAULT=@im=fcitx
@@ -203,5 +212,4 @@ echo "Successfully set alias!"
 
 echo "Your system is installed. Press any key now to shutdown system and remove bootable media, then restart"
 read empty
-exit
 shutdown now
