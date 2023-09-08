@@ -134,9 +134,9 @@ cat >> /mnt/etc/pacman.conf << EOF
 # Server = https://pacman.ltd/archlinux/\$arch
 # Server = https://repo.clansty.com/archlinux/\$arch
 
-[menci]
-SigLevel = Never
-Server = https://aur.men.ci/archlinux/\$arch
+# [menci]
+# SigLevel = Never
+# Server = https://aur.men.ci/archlinux/\$arch
 EOF
 echo "Config pacman conf successfully!"
 
@@ -170,7 +170,7 @@ title          Arch Linux
 linux          /vmlinuz-linux-zen
 initrd         /initramfs-linux-zen.img
 initrd         /"$UCODE".img
-options        root=UUID="$ROOT_PART" rootflags=subvol=@,compress=zstd:3 rw loglevel=3 quiet systemd.show_status=1
+options        root=UUID="$ROOT_PART" rootflags=subvol=@,compress=zstd:3 rw loglevel=3 quiet systemd.show_status=1 nmi_watchdog=0 nowatchdog module_blacklist=iTCO_wdt
 EOF
 arch-chroot /mnt systemctl enable systemd-boot-update.service
 echo "Enable systemd-boot-update.service successfully!"
@@ -209,6 +209,8 @@ EOF
 echo "Successfully set environment variables!"
 echo "Successfully set PATH!"
 echo "Successfully set alias!"
+kwriteconfig5 --file kdesurc --group super-user-command --key super-user-command sudo
+echo "Successfully set kdesu!"
 
 echo "Your system is installed. Press any key now to shutdown system and remove bootable media, then restart"
 read empty
