@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# 存在无法断点的问题，暂时不可用
+# 存在无法断点的问题
 
 # # Check if a configuration file is provided as a command line argument
 # if [ -z "$1" ]; then
